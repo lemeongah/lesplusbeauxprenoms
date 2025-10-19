@@ -28,7 +28,7 @@ docker compose down || true
 
 if [ "$RESET_DB" = true ]; then
   echo "🧨 Suppression du volume de base de données (option --reset)..."
-  VOLUME_NAME=$(docker volume ls --format '{{.Name}}' | grep "${COMPOSE_PROJECT_NAME:-$(basename "$PWD")}_db_data")
+  VOLUME_NAME=$(docker volume ls --format '{{.Name}}' | grep "${COMPOSE_PROJECT_NAME:-$(basename "$PWD")}_db_data" || true)
   if [[ -n "$VOLUME_NAME" ]]; then
     docker volume rm "$VOLUME_NAME" || true
   fi
