@@ -21,14 +21,12 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             set -e
-            cd /var/www/${{ secrets.FOLDER_NAME }}/
-
+            cd /var/www/${{ secrets.FOLDER_NAME }}
             echo "🔍 Nettoyage des modifications locales..."
             git fetch origin
             git reset --hard origin/main
             git clean -fd
-
             echo "🚀 Lancement de Docker..."
-            cd project/
+            cd project
             docker compose down || true
             docker compose up -d --build
