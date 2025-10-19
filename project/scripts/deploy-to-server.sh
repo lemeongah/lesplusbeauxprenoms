@@ -167,7 +167,7 @@ log_success "Configuration .env transférée"
 
 log_info "Installation de WordPress sur le serveur... (cela peut prendre quelques minutes)"
 
-ssh -i "$SSH_KEY_PATH" "$SERVER_USER@$SERVER_HOST" << 'ENDSSH'
+ssh -i "$SSH_KEY_PATH" "$SERVER_USER@$SERVER_HOST" << ENDSSH
 set -e
 
 cd /var/www/$FOLDER_NAME/project
@@ -256,11 +256,8 @@ scp -i "$SSH_KEY_PATH" "$NGINX_CONF" "$SERVER_USER@$SERVER_HOST:/tmp/nginx_${COM
 ssh -i "$SSH_KEY_PATH" "$SERVER_USER@$SERVER_HOST" << ENDSSH
 set -e
 
-# Copier la configuration
-sudo cp /tmp/nginx_${COMPOSE_PROJECT_NAME}.conf /etc/nginx/sites-available/$DOMAIN
-
-# Créer le lien symbolique
-sudo ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/
+# Copier la configuration directement dans conf.d
+sudo cp /tmp/nginx_${COMPOSE_PROJECT_NAME}.conf /etc/nginx/conf.d/$DOMAIN.conf
 
 # Créer le dossier pour Let's Encrypt si nécessaire
 sudo mkdir -p /var/www/_letsencrypt
