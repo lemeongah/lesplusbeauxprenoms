@@ -1,5 +1,4 @@
 # WordPress Site Template
-
 Template pour créer rapidement des sites WordPress optimisés pour le SEO et la monétisation.
 
 ## 🚀 Démarrage Rapide
