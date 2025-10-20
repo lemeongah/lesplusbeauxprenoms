@@ -10,24 +10,24 @@ Version: 1.0
    ======================================== */
 :root {
     /* === COULEURS PRINCIPALES === */
-    --background-color: #fff;
-    --font-color: #000;
+    --background-color: #fdfbf7;
+    --font-color: #3d3d3d;
     --font-color-light: #fff;
-    --font-color-dark: #000;
-    --font-color-dark-light: #000;
-    --secondary-color: #208bfe;
-    --accent-color: #208bfe;
-    --text-muted: #666;
-    --border-color: #e0e0e0;
-    --hover-color: #f5f5f5;
+    --font-color-dark: #2c2c2c;
+    --font-color-dark-light: #5a5a5a;
+    --secondary-color: #ff9ec5;
+    --accent-color: #ffd166;
+    --text-muted: #8e8e8e;
+    --border-color: #f0e5d8;
+    --hover-color: #fff5eb;
 
-    /* === COULEURS HEADER/NAVIGATION === */
-    --header-bg: #fff;
-    --nav-text-color: #000;
-    --nav-hover-color: #208bfe;
-    --nav-active-color: #208bfe;
-    --nav-bg-hover: transparent;
-    --nav-border-hover: #208bfe;
+    /* === COULEURS HEADER/NAVIGATION - THÈME BÉBÉ === */
+    --header-bg: linear-gradient(135deg, #fff9f3 0%, #ffe8f0 100%);
+    --nav-text-color: #5a5a5a;
+    --nav-hover-color: #ff9ec5;
+    --nav-active-color: #ff85b3;
+    --nav-bg-hover: rgba(255, 158, 197, 0.08);
+    --nav-border-hover: #ffc9e0;
 
     /* === COULEURS FOOTER === */
     --footer-bg: #fff;
@@ -42,10 +42,10 @@ Version: 1.0
     --card-hover-bg: #f9f9f9;
 
     /* === COULEURS CATÉGORIES === */
-    --category-bg: #208bfe;
+    --category-bg: #ff9ec5;
     --category-text: #fff;
-    --category-border: #208bfe;
-    --category-hover-bg: #1a73d9;
+    --category-border: #ff9ec5;
+    --category-hover-bg: #ff85b3;
 
     /* === TYPOGRAPHIE === */
     --font-family-primary: "Lato", sans-serif;
@@ -89,13 +89,14 @@ Version: 1.0
 
     /* === NAVIGATION - STYLES === */
     --nav-layout: flex; /* flex, block, inline-flex */
-    --nav-gap: 2rem;
-    --nav-padding: 0.5rem 0;
-    --nav-font-weight: var(--font-weight-medium);
-    --nav-font-size: var(--font-size-base);
-    --nav-border-bottom-width: 2px;
+    --nav-gap: 2.5rem;
+    --nav-padding: 0.75rem 1.25rem;
+    --nav-font-weight: 500;
+    --nav-font-size: 1rem;
+    --nav-border-bottom-width: 0px;
     --nav-border-bottom-style: solid;
-    --nav-transition: all 0.3s ease;
+    --nav-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --nav-border-radius: 25px;
 
     /* === CARDS - STYLES CONFIGURABLES === */
     --card-shadow: var(--shadow-none); /* Modifiable : var(--shadow-sm), var(--shadow-md), etc. */

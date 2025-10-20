@@ -43,6 +43,14 @@ function theme_enqueue_styles()
             false
         );
 
+        // 3) Header Baby Theme - Style spécifique pour site de prénoms
+        wp_enqueue_style(
+            'header-baby-theme',
+            'https://static.le-meon.com/css/header-baby-theme.css',
+            ['lemeon-shared'],
+            false
+        );
+
     // Utiliser le bon chemin selon l'environnement
     if (is_production()) {
         // En production, utiliser des URLs absolues pour éviter les problèmes mixtes HTTP/HTTPS
