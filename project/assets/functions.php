@@ -272,7 +272,7 @@ function add_mosaic_click_handler() {
 // ========================================
 function add_google_analytics()
 {
-    $measurement_id = 'G-LB7VMHMSVF';
+    $measurement_id = 'G-NPJWP8NS70';
     ?>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=<?php echo esc_attr($measurement_id); ?>"></script>
