@@ -140,11 +140,11 @@ Version: 1.0
     background: #4897cc!important;
 }
 
-.inside-article {
-    background-color: red;
-}
+
 .home-mosaic li.full-width.restructured {
     max-height: 500px!important;
 }
 .comments-area {
 display: none!important;}
+.inside-header {
+    min-width: 90vw!important;}
