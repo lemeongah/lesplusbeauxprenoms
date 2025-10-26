@@ -34,8 +34,7 @@ services:
       FOLDER_NAME: ${FOLDER_NAME}
     volumes:
       - wordpress_data:/var/www/html
-      - generatepress_child_data:/var/www/html/wp-content/themes/generatepress-child/
-      - ./assets:/var/www/html/wp-content/themes/generatepress-child/assets/
+      - ./assets:/var/www/html/wp-content/themes/generatepress-child
       - ./assets:/var/www/html/wp-content/uploads/custom
 
   wpcli:
