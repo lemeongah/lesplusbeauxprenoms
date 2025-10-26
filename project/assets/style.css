@@ -143,3 +143,6 @@ Version: 1.0
 .inside-article {
     background-color: transparent!important;
 }
+.home-mosaic li.full-width.restructured {
+    max-height: 500px!important;
+}
