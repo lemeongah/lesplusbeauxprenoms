@@ -27,81 +27,22 @@ echo "🧼 Nettoyage containers..."
 docker compose down || true
 
 if [ "$RESET_DB" = true ]; then
-  echo "🧨 Suppression du volume de base de données (option --reset)..."
-  VOLUME_NAME=$(docker volume ls --format '{{.Name}}' | grep "${COMPOSE_PROJECT_NAME:-$(basename "$PWD")}_db_data" || true)
-  if [[ -n "$VOLUME_NAME" ]]; then
-    docker volume rm "$VOLUME_NAME" || true
+  echo "🧨 Suppression des volumes (option --reset)..."
+  VOLUME_DB=$(docker volume ls --format '{{.Name}}' | grep "${COMPOSE_PROJECT_NAME:-$(basename "$PWD")}_db_data" || true)
+  VOLUME_WP=$(docker volume ls --format '{{.Name}}' | grep "${COMPOSE_PROJECT_NAME:-$(basename "$PWD")}_wordpress_data" || true)
+
+  if [[ -n "$VOLUME_DB" ]]; then
+    docker volume rm "$VOLUME_DB" || true
   fi
+  if [[ -n "$VOLUME_WP" ]]; then
+    docker volume rm "$VOLUME_WP" || true
+  fi
+  echo "✅ Volumes supprimés"
 else
-  echo "✅ Volume base de données conservé."
+  echo "✅ Volumes conservés."
 fi
-echo "🧼 Nettoyage des fichiers temporaires..."
-sudo rm -rf wp tmp_wordpress generatepress.zip
-mkdir -p wp tmp_wordpress
 
-echo "📦 Téléchargement WordPress..."
-wget https://wordpress.org/latest.tar.gz -O tmp_wordpress/latest.tar.gz
-tar -xzf tmp_wordpress/latest.tar.gz --strip-components=1 -C wp
-rm -rf tmp_wordpress
-
-echo "🔐 Permissions initiales sur wp/"
-sudo chown -R 33:33 wp
-sudo find wp -type d -exec chmod 755 {} \;
-sudo find wp -type f -exec chmod 644 {} \;
-
-echo "📁 wp-content/upgrade"
-sudo mkdir -p wp/wp-content/upgrade
-sudo chown -R 33:33 wp/wp-content
-sudo find wp/wp-content -type d -exec chmod 755 {} \;
-sudo find wp/wp-content -type f -exec chmod 644 {} \;
-
-echo "⚙️ Création de wp-config.php..."
-cat << EOF | sudo tee wp/wp-config.php > /dev/null
-<?php
-define( 'DB_NAME', '$DB_NAME' );
-define( 'DB_USER', '$DB_USER' );
-define( 'DB_PASSWORD', '$DB_PASSWORD' );
-define( 'DB_HOST', 'db:3306' );
-define( 'DB_CHARSET', 'utf8' );
-define( 'DB_COLLATE', '' );
-
-define( 'AUTH_KEY',         '$(openssl rand -base64 32)' );
-define( 'SECURE_AUTH_KEY',  '$(openssl rand -base64 32)' );
-define( 'LOGGED_IN_KEY',    '$(openssl rand -base64 32)' );
-define( 'NONCE_KEY',        '$(openssl rand -base64 32)' );
-define( 'AUTH_SALT',        '$(openssl rand -base64 32)' );
-define( 'SECURE_AUTH_SALT', '$(openssl rand -base64 32)' );
-define( 'LOGGED_IN_SALT',   '$(openssl rand -base64 32)' );
-define( 'NONCE_SALT',       '$(openssl rand -base64 32)' );
-
-define( 'FS_METHOD', 'direct' );
-\$table_prefix = 'wp_';
-EOF
-
-if [ "$ENVIRONMENT" = "local" ]; then
-cat << EOF | sudo tee -a wp/wp-config.php > /dev/null
-define( 'WP_DEBUG', true );
-define( 'WP_DEBUG_LOG', true );
-define( 'WP_DEBUG_DISPLAY', false );
-define( 'WP_HOME', '$SITE_URL' );
-define( 'WP_SITEURL', '$SITE_URL' );
-EOF
-else
-cat << EOF | sudo tee -a wp/wp-config.php > /dev/null
-define( 'WP_DEBUG', false );
-define( 'WP_DEBUG_DISPLAY', false );
-define( 'WP_HOME', '$SITE_URL' );
-define( 'WP_SITEURL', '$SITE_URL' );
-define( 'FORCE_SSL_ADMIN', true );
-define( 'FORCE_SSL_LOGIN', true );
-if ( isset(\$_SERVER['HTTP_X_FORWARDED_PROTO']) && \$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https' ) {
-  \$_SERVER['HTTPS'] = 'on';
-}
-EOF
-fi
-echo "require_once ABSPATH . 'wp-settings.php';" | sudo tee -a wp/wp-config.php > /dev/null
-
-echo "🚀 Lancement des containers..."
+echo "🚀 Démarrage des containers (WordPress est auto-inicializé)..."
 docker compose up -d
 
 echo "⏳ Attente de la base de données..."
@@ -119,7 +60,21 @@ for i in {1..30}; do
   sleep 2
 done
 
-wpcli() { docker compose run --rm -v "$(pwd)/wp:/var/www/html" wpcli "$@"; }
+echo "⏳ Attente que WordPress soit initialisé..."
+# Attendre que WordPress soit accessible
+for i in {1..30}; do
+  if docker compose exec -T wordpress curl -s http://localhost/wp-json/ &>/dev/null; then
+    echo "✅ WordPress opérationnel après $((i*2)) secondes"
+    break
+  fi
+  if [ $i -eq 30 ]; then
+    echo "⚠️  WordPress met du temps à démarrer, continuons..."
+    break
+  fi
+  sleep 2
+done
+
+wpcli() { docker compose run --rm wpcli "$@"; }
 
 echo "🛠️ Installation WordPress..."
 wpcli core install \
@@ -128,7 +83,7 @@ wpcli core install \
   --admin_user="$ADMIN_USER" \
   --admin_password="$ADMIN_PASSWORD" \
   --admin_email="$ADMIN_EMAIL" \
-  --skip-email
+  --skip-email || echo "⚠️  WordPress est peut-être déjà installé"
 
 echo "🔌 Plugins..."
 wpcli plugin install seo-by-rank-math wpforms-lite wp-fastest-cache --activate
@@ -145,7 +100,6 @@ for ID in $(wpcli post list --format=ids); do
   wpcli post update "$ID" --comment_status=closed --ping_status=closed
 done
 
-
 echo "🌐 Installation de Polylang..."
 wpcli plugin install polylang --activate
 
@@ -157,119 +111,130 @@ wpcli language core activate fr_FR
 # Mettre le site en français par défaut (WordPress général)
 wpcli option update WPLANG fr_FR
 
-
 echo "🎨 Installation du thème GeneratePress..."
-wget -qO generatepress.zip https://downloads.wordpress.org/theme/generatepress.3.5.1.zip
-echo "🔧 Correction des permissions du dossier themes..."
-sudo mkdir -p wp/wp-content/themes
-sudo chown -R $USER:$USER wp/wp-content/themes
-sudo chmod -R 755 wp/wp-content/themes
-unzip -q generatepress.zip -d wp/wp-content/themes/
-rm generatepress.zip
-sudo chown -R 33:33 wp/wp-content/themes/generatepress
-sudo find wp/wp-content/themes/generatepress -type d -exec chmod 755 {} \;
-sudo find wp/wp-content/themes/generatepress -type f -exec chmod 644 {} \;
+# Récupérer la version du thème depuis WordPress.org
+wpcli theme install generatepress --activate
 
-echo "👶 Génération du thème enfant depuis assets/..."
-CHILD_DIR="wp/wp-content/themes/generatepress-child"
-rm -rf "$CHILD_DIR"
-mkdir -p "$CHILD_DIR"
+echo "👶 Génération du thème enfant personnalisé..."
 
-# Copier uniquement ce qui existe
-cp ./assets/functions.php "$CHILD_DIR/functions.php" || echo "⚠️ functions.php non trouvé"
-cp ./assets/footer.html "$CHILD_DIR/footer.html" || echo "ℹ️ footer.html pas obligatoire"
+# Créer le child theme dans un volume Docker (pas un mount host)
+# Cela évite les problèmes de permissions
 
-# Génération du style.css
-cat << 'EOF' > "$CHILD_DIR/style.css"
+CHILD_DIR="/var/www/html/wp-content/themes/generatepress-child"
+
+# Créer le répertoire du child theme
+docker compose exec -T wordpress mkdir -p "$CHILD_DIR"
+
+# Créer style.css
+docker compose exec -T wordpress sh -c "cat > $CHILD_DIR/style.css << 'EOF'
 /*
 Theme Name: GeneratePress Child
 Template: generatepress
 Version: 1.0
+Author: Fluenzr
+Description: Child theme personnalisé pour Fluenzr
+License: GNU General Public License v2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 */
+
+/* Import du CSS du thème parent */
+@import url(\"../generatepress/assets/css/main.min.css\");
+
+/* Styles personnalisés */
+:root {
+    --background-color: #fff;
+    --font-color: #000;
+    --secondary-color: #208bfe;
+    --accent-color: #208bfe;
+}
 EOF
+"
 
-# Permissions
-sudo chown -R 33:33 "$CHILD_DIR"
-sudo find "$CHILD_DIR" -type d -exec chmod 755 {} \;
-sudo find "$CHILD_DIR" -type f -exec chmod 644 {} \;
+# Créer functions.php avec support des logos et favicons
+docker compose exec -T wordpress sh -c "cat > $CHILD_DIR/functions.php << 'EOF'
+<?php
+/**
+ * GeneratePress Child Theme Functions
+ */
 
-# Activation
-wpcli theme activate generatepress-child
+// Ajouter le support du logo personnalisé
+add_action( 'after_setup_theme', 'generatepress_child_setup' );
+function generatepress_child_setup() {
+    add_theme_support( 'custom-logo', array(
+        'height'      => 60,
+        'width'       => 200,
+        'flex-height' => true,
+        'flex-width'  => true,
+    ) );
+    add_theme_support( 'site-icon' );
+}
 
+// Charger les styles du child theme
+add_action( 'wp_enqueue_scripts', 'generatepress_child_enqueue_styles' );
+function generatepress_child_enqueue_styles() {
+    wp_enqueue_style( 'generatepress-child', get_stylesheet_uri() );
 
-# Activer le thème enfant
-wpcli theme activate generatepress-child
-echo "👶 Thème enfant..."
-mkdir -p wp/wp-content/themes/generatepress-child
-sudo mkdir -p wp/wp-content/themes/generatepress-child
-sudo chown -R $USER:$USER wp/wp-content/themes/generatepress-child
-sudo chmod -R 755 wp/wp-content/themes/generatepress-child
-echo "👶 Génération du thème enfant depuis assets/..."
-CHILD_DIR="wp/wp-content/themes/generatepress-child"
-rm -rf "$CHILD_DIR"
-mkdir -p "$CHILD_DIR"
-
-cp ./assets/functions.php "$CHILD_DIR/functions.php"
-cp ./assets/style.css "$CHILD_DIR/style.css"
-# cp ./assets/functions.php wp/wp-content/themes/generatepress-child/functions.php
-cat << 'EOF' > wp/wp-content/themes/generatepress-child/style.css
-/*
-Theme Name: GeneratePress Child
-Template: generatepress
-Version: 1.0
-*/
+    // Charger les styles personnalisés du dossier assets s'ils existent
+    $custom_css = get_stylesheet_directory() . '/assets/custom-styles.css';
+    if ( file_exists( $custom_css ) ) {
+        wp_enqueue_style( 'generatepress-custom', get_stylesheet_directory_uri() . '/assets/custom-styles.css' );
+    }
+}
 EOF
-sudo chown -R 33:33 wp/wp-content/themes/generatepress-child
-sudo mkdir -p wp/wp-content/themes/generatepress-child
-sudo chown -R $USER:$USER wp/wp-content/themes/generatepress-child
-sudo chmod -R 755 wp/wp-content/themes/generatepress-child
-wpcli theme activate generatepress-child
+"
 
-echo "🖼️ Copie des assets..."
-sudo mkdir -p wp/wp-content/uploads/custom/css
-sudo chown -R $USER:$USER wp/wp-content/uploads/custom
-cp -r ./assets/* wp/wp-content/uploads/custom/
-cp ./assets/style.css wp/wp-content/uploads/custom/css/styles.css
-sudo chown -R 33:33 wp/wp-content/uploads/custom
-sudo find wp/wp-content/uploads/custom -type d -exec chmod 755 {} \;
-sudo find wp/wp-content/uploads/custom -type f -exec chmod 644 {} \;
-sudo chown -R 33:33 wp/wp-content/uploads/custom/css
-sudo find wp/wp-content/uploads/custom/css -type d -exec chmod 755 {} \;
-sudo find wp/wp-content/uploads/custom/css -type f -exec chmod 644 {} \;
+# Copier les fichiers assets si disponibles
+if [ -f "./assets/functions.php" ]; then
+  docker compose exec -T wordpress cp ./assets/functions.php "$CHILD_DIR/functions.php" 2>/dev/null || echo "⚠️  Impossible de copier functions.php"
+fi
+
+# Copier le logo et favicon
+if [ -f "./assets/logo.png" ]; then
+  docker compose exec -T wordpress cp ./assets/logo.png "$CHILD_DIR/logo.png" 2>/dev/null || echo "⚠️  Impossible de copier logo.png"
+fi
+
+if [ -f "./assets/favicon.png" ]; then
+  docker compose exec -T wordpress cp ./assets/favicon.png "$CHILD_DIR/favicon.png" 2>/dev/null || echo "⚠️  Impossible de copier favicon.png"
+fi
+
+# Copier les styles personnalisés
+if [ -f "./assets/style.css" ]; then
+  docker compose exec -T wordpress mkdir -p "$CHILD_DIR/assets"
+  docker compose exec -T wordpress cp ./assets/style.css "$CHILD_DIR/assets/custom-styles.css" 2>/dev/null || echo "⚠️  Impossible de copier styles"
+fi
+
+# Attendre que WordPress rescanne les thèmes
+sleep 2
+
+# Activer le child theme
+echo "🎨 Activation du child theme..."
+wpcli theme activate generatepress-child || {
+  echo "⚠️  Impossible d'activer le child theme"
+  echo "📋 Themes disponibles :"
+  wpcli theme list
+}
+
 echo "🔁 Permaliens..."
 wpcli rewrite structure "/%postname%/"
 wpcli rewrite flush --hard
 
-
-
-echo "le logo"
-echo "✅ Fix des permissions avant import du logo..."
-sudo chown -R 33:33 wp/wp-content/uploads
-sudo find wp/wp-content/uploads -type d -exec chmod 755 {} \;
-sudo find wp/wp-content/uploads -type f -exec chmod 644 {} \;
-
-# Ajouter le logo du site
-LOGO_ID=$(wpcli media import /assets/logo.png --title="Logo" --porcelain)
-wpcli theme mod set custom_logo "$LOGO_ID"
+# Ajouter le logo du site si present
+echo "🖼️ Import du logo..."
+if [ -f "./assets/logo.png" ]; then
+  LOGO_ID=$(wpcli media import /var/www/html/wp-content/themes/generatepress-child/logo.png --title="Logo" --porcelain 2>/dev/null || echo "0")
+  if [ "$LOGO_ID" != "0" ]; then
+    wpcli theme mod set custom_logo "$LOGO_ID"
+  fi
+else
+  echo "⚠️  logo.png non trouvé dans assets/"
+fi
 
 echo "📋 (Re)Création du menu principal avec les catégories..."
 wpcli menu delete "Menu Principal" 2>/dev/null || true
 wpcli menu create "Menu Principal"
 wpcli menu location assign "Menu Principal" primary
 
-# echo "🏷️ Création des catégories, pages et ajout au menu..."
-# CATEGORIES=(
-#   "ugc-parents|Parents"
-#   "ugc-marques|Marques"
-#   "ugc-enfants|Enfants"
-# )
-# echo "📋 (Re)Création du menu principal avec les catégories..."
-# wpcli menu delete "Menu Principal" 2>/dev/null || true
-# wpcli menu create "Menu Principal"
-# wpcli menu location assign "Menu Principal" primary
-
 # Création des catégories et des pages liées
-
 for entry in "${CATEGORIES_ARRAY[@]}"; do
   IFS="|" read -r slug label <<< "$entry"
 
@@ -284,15 +249,7 @@ for entry in "${CATEGORIES_ARRAY[@]}"; do
   wpcli post meta add "$page_id" _generate_hide_title true
 
   # Bloc WP avec filtre par catégorie
-  block="<!-- wp:latest-posts {\
-\"categories\":[\"$slug\"],\
-\"displayPostContent\":true,\
-\"excerptLength\":20,\
-\"displayPostDate\":true,\
-\"displayFeaturedImage\":true,\
-\"featuredImageSizeSlug\":\"medium\"} /
-\"layout\":{\"type\":\"grid\",\"columns\":3} } /-->"
-
+  block="<!-- wp:latest-posts {\"categories\":[\"$slug\"],\"displayPostContent\":true,\"excerptLength\":20,\"displayPostDate\":true,\"displayFeaturedImage\":true,\"featuredImageSizeSlug\":\"medium\",\"layout\":{\"type\":\"grid\",\"columns\":3}} /-->"
 
   wpcli post update "$page_id" --post_content="$block"
 
@@ -309,35 +266,13 @@ HOME_ID=$(wpcli post create \
 
 wpcli post meta add "$HOME_ID" _generate_hide_title true
 
-home_block="<!-- wp:latest-posts {\
-\"displayPostContent\":true,\
-\"excerptLength\":20,\
-\"displayPostDate\":true,\
-\"displayFeaturedImage\":true,\
-\"featuredImageSizeSlug\":\"medium\"} /
-\"layout\":{\"type\":\"grid\",\"columns\":3} } /-->"
+home_block="<!-- wp:latest-posts {\"displayPostContent\":true,\"excerptLength\":20,\"displayPostDate\":true,\"displayFeaturedImage\":true,\"featuredImageSizeSlug\":\"medium\",\"layout\":{\"type\":\"grid\",\"columns\":3}} /-->"
 
 wpcli post update "$HOME_ID" --post_content="$home_block"
 
 # Définir la page d'accueil statique
 wpcli option update show_on_front page
 wpcli option update page_on_front "$HOME_ID"
-
-
-
-
-echo "🛠️ Fixe final des permissions..."
-sudo chown -R 33:33 wp
-sudo find wp -type d -exec chmod 755 {} \;
-sudo find wp -type f -exec chmod 644 {} \;
-
-echo "🔍 🔐 Audit des permissions finales (debug) :"
-echo "➡️ wp-content permissions"
-ls -l wp/wp-content | grep -E 'themes|uploads|upgrade'
-echo "➡️ generatepress/"
-ls -l wp/wp-content/themes/generatepress | head
-echo "➡️ uploads/custom/"
-ls -l wp/wp-content/uploads/custom | head
 
 docker compose restart
 echo "✅ Site opérationnel : $SITE_URL"
