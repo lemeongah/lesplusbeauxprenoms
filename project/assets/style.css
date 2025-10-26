@@ -141,8 +141,10 @@ Version: 1.0
 }
 
 .inside-article {
-    background-color: transparent!important;
+    background-color: red;
 }
 .home-mosaic li.full-width.restructured {
     max-height: 500px!important;
 }
+.comments-area {
+display: none!important;}
