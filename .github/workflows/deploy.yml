@@ -30,23 +30,22 @@ jobs:
             mkdir -p "$DEPLOY_DIR"
             cd "$DEPLOY_DIR"
 
-            # Clean up .git if it exists
+            # Vérifier si le repo git existe déjà
             if [ -d .git ]; then
-              echo "🧹 Nettoyage du répertoire .git existant..."
-              rm -rf .git
+              echo "🔄 Repository existant - mise à jour..."
+              git fetch origin main
+              git reset --hard origin/main
+              git clean -fd
+            else
+              echo "📥 Initialisation du repository..."
+              git init
+              git remote add origin https://github.com/${{ github.repository }}.git
+              echo "🔄 Synchronisation du code depuis GitHub..."
+              git fetch origin main
+              echo "✨ Reset au dernier commit..."
+              git reset --hard origin/main
+              git clean -fd
             fi
-
-            # Initialize git repo (fresh)
-            echo "📥 Initialisation du repository..."
-            git init
-            git remote add origin https://github.com/${{ github.repository }}.git
-
-            echo "🔄 Synchronisation du code depuis GitHub..."
-            git fetch origin main
-
-            echo "✨ Reset au dernier commit..."
-            git reset --hard origin/main
-            git clean -fd
 
             echo "📊 État du déploiement..."
             echo "  Repository: ${{ github.repository }}"
